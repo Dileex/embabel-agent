@@ -25,8 +25,8 @@ POST /agent/ask
 当前包含两个 Agent：
 
 ```text
-星座文案：StarNewsAgent
-制度问答：PolicyAgent
+星座文案 Agent：StarNewsAgent
+制度问答 Agent：PolicyAgent
 ```
 
 ## 运行环境
@@ -58,7 +58,7 @@ mvn spring-boot:run
 
 ## 请求接口
 
-星座文案：
+星座文案 Agent：
 
 ```bash
 curl -X POST "http://localhost:8080/agent/ask" \
@@ -71,6 +71,7 @@ curl -X POST "http://localhost:8080/agent/ask" \
 ```json
 {
   "processId": "brave_bouman",
+  "agentName": "StarNewsAgent",
   "outputType": "Writeup",
   "output": {
     "title": "李白今日任务拆解指南",
@@ -80,7 +81,7 @@ curl -X POST "http://localhost:8080/agent/ask" \
 }
 ```
 
-制度问答：
+制度问答 Agent：
 
 ```bash
 curl -X POST "http://localhost:8080/agent/ask" \
@@ -93,6 +94,7 @@ curl -X POST "http://localhost:8080/agent/ask" \
 ```json
 {
   "processId": "sad_mendeleev",
+  "agentName": "PolicyAgent",
   "outputType": "PolicyAnswer",
   "output": {
     "title": "差旅报销材料要求",
@@ -102,11 +104,11 @@ curl -X POST "http://localhost:8080/agent/ask" \
 }
 ```
 
-`processId` 和模型生成的表达会随请求变化，不要求逐字一致。关键是 `outputType`：
+`processId` 和模型生成的表达会随请求变化，不要求逐字一致。关键是 `agentName` 和 `outputType`：
 
 ```text
-星座文案 -> Writeup
-制度问答 -> PolicyAnswer
+星座文案 Agent -> StarNewsAgent -> Writeup
+制度问答 Agent -> PolicyAgent -> PolicyAnswer
 ```
 
 ## 关键代码
@@ -136,11 +138,12 @@ Embabel 调用入口：AgentService -> Autonomy.chooseAndRunAgent(...)
 星座资料服务：HoroscopeService
 制度资料服务：PolicyKnowledgeService
 提示词配置：application.yml -> demo.star-news-agent / demo.policy-agent
+输出校验：AgentService -> validateOutput(...)
 ```
 
 ## 执行链路
 
-星座文案：
+星座文案 Agent：
 
 ```text
 chooseAndRunAgent
@@ -151,7 +154,7 @@ chooseAndRunAgent
 -> Writeup
 ```
 
-制度问答：
+制度问答 Agent：
 
 ```text
 chooseAndRunAgent
@@ -161,3 +164,14 @@ chooseAndRunAgent
 -> answer
 -> PolicyAnswer
 ```
+
+## 结果校验
+
+`AgentService` 会对最终输出做一层轻量校验：
+
+```text
+Writeup -> title / summary / advice 不能为空，summary 和 advice 需要是完整句子
+PolicyAnswer -> title / answer / source 不能为空，answer 需要是完整句子
+```
+
+校验不通过时返回 `502`。如果 Embabel 没有选中合适的 Agent，`NoAgentFound` 会作为 `ProcessExecutionException` 被捕获，当前示例同样转成 `502`。
