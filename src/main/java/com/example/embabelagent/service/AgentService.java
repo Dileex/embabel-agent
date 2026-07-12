@@ -4,9 +4,12 @@ import com.embabel.agent.api.common.autonomy.AgentProcessExecution;
 import com.embabel.agent.api.common.autonomy.Autonomy;
 import com.embabel.agent.api.common.autonomy.ProcessExecutionException;
 import com.embabel.agent.core.ProcessOptions;
-import com.example.embabelagent.agent.PolicyAgent.PolicyAnswer;
-import com.example.embabelagent.agent.StarNewsAgent.Writeup;
+import com.example.embabelagent.agent.QuizAgent.QuizPack;
+import com.example.embabelagent.agent.QuizAgent.QuizQuestion;
 import com.example.embabelagent.dto.AgentResponse;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -38,19 +41,55 @@ public class AgentService {
     }
 
     private void validateOutput(Object output) {
-        if (output instanceof Writeup writeup) {
-            requireText(writeup.title(), "Writeup.title");
-            requireCompleteSentence(writeup.summary(), "Writeup.summary");
-            requireCompleteSentence(writeup.advice(), "Writeup.advice");
-            return;
-        }
-        if (output instanceof PolicyAnswer answer) {
-            requireText(answer.title(), "PolicyAnswer.title");
-            requireCompleteSentence(answer.answer(), "PolicyAnswer.answer");
-            requireText(answer.source(), "PolicyAnswer.source");
+        if (output instanceof QuizPack quizPack) {
+            requireText(quizPack.title(), "QuizPack.title");
+            requireQuestions(quizPack.questions());
+            requireCompleteSentence(quizPack.review(), "QuizPack.review");
             return;
         }
         throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unsupported agent output type");
+    }
+
+    private void requireQuestions(List<QuizQuestion> questions) {
+        if (questions == null || questions.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Agent returned empty quiz questions");
+        }
+        for (int index = 0; index < questions.size(); index++) {
+            QuizQuestion question = questions.get(index);
+            String prefix = "QuizPack.questions[" + index + "]";
+            requireText(question.question(), prefix + ".question");
+            if (question.options() == null || question.options().size() != 4) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "Agent returned invalid options: " + prefix + ".options");
+            }
+            requireOptions(question.options(), prefix + ".options");
+            requireAnswerInOptions(question.answer(), question.options(), prefix + ".answer");
+            requireCompleteSentence(question.explanation(), prefix + ".explanation");
+        }
+    }
+
+    private void requireOptions(List<String> options, String fieldName) {
+        Set<String> uniqueOptions = new HashSet<>();
+        for (int optionIndex = 0; optionIndex < options.size(); optionIndex++) {
+            String option = options.get(optionIndex);
+            requireText(option, fieldName + "[" + optionIndex + "]");
+            if (!uniqueOptions.add(option.strip())) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "Agent returned duplicated option: " + fieldName + "[" + optionIndex + "]");
+            }
+        }
+    }
+
+    private void requireAnswerInOptions(String answer, List<String> options, String fieldName) {
+        requireText(answer, fieldName);
+        String normalizedAnswer = answer.strip();
+        boolean matched = options.stream()
+                .map(String::strip)
+                .anyMatch(normalizedAnswer::equals);
+        if (!matched) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Agent returned answer outside options: " + fieldName);
+        }
     }
 
     private void requireText(String value, String fieldName) {
