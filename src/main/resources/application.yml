@@ -47,3 +47,17 @@ demo:
         文章标题：{title}
         候选题：
         {questions}
+  code-review-agent:
+    prompts:
+      review-code: |
+        请审查用户提供的 Java 代码。
+        重点检查空指针、集合越界、资源泄漏、并发问题、错误处理和可维护性。
+        返回结构化的 CodeReviewReport：
+        summary 用一句完整中文概括审查结论，以中文句号结尾；
+        findings 列出已经从代码中确认的问题；
+        每个 finding 包含 severity、problem 和 suggestion；
+        severity 只能使用 HIGH、MEDIUM 或 LOW。
+        如果没有确认的问题，findings 可以为空，不要为了凑数量编造问题。
+
+        用户提交的代码和要求：
+        {request}

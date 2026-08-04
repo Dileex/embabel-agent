@@ -21,7 +21,22 @@ public class AgentController {
 
     @PostMapping("/ask")
     public AgentResponse ask(@Valid @RequestBody AgentRequest request) {
-        return agentService.ask(request.message());
+        return agentService.closed(request.message());
+    }
+
+    @PostMapping("/focused")
+    public AgentResponse focused(@Valid @RequestBody AgentRequest request) {
+        return agentService.focused(request.message());
+    }
+
+    @PostMapping("/closed")
+    public AgentResponse closed(@Valid @RequestBody AgentRequest request) {
+        return agentService.closed(request.message());
+    }
+
+    @PostMapping("/open")
+    public AgentResponse open(@Valid @RequestBody AgentRequest request) {
+        return agentService.open(request.message());
     }
 
 }
