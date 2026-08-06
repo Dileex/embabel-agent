@@ -39,4 +39,10 @@ public class AgentController {
         return agentService.open(request.message());
     }
 
+    @PostMapping("/parallel")
+    public AgentResponse parallel(
+            @Valid @RequestBody AgentRequest request) {
+        return agentService.parallel(request.message());
+    }
+
 }

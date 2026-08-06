@@ -61,3 +61,52 @@ demo:
 
         用户提交的代码和要求：
         {request}
+  parallel-incident-agent:
+    prompts:
+      analyze-logs: |
+        请只根据故障现象和日志片段整理日志证据。
+        返回AnalysisContent：items、conclusion、flagged。
+        items列出1到5条日志中已经出现的异常或关键信息。
+        conclusion用一句完整中文说明日志能支持什么判断，以中文句号结尾。
+        flagged表示日志里是否出现明确异常。
+        不要补充输入中没有的日志，也不要把推测写成事实。
+        只返回结构化对象。
+
+        故障现象：{symptom}
+        日志片段：{logs}
+      analyze-metrics: |
+        请只根据故障现象和监控指标整理指标证据。
+        返回AnalysisContent：items、conclusion、flagged。
+        items列出1到5条已经出现的指标变化。
+        conclusion用一句完整中文说明指标能支持什么判断，以中文句号结尾。
+        flagged表示指标里是否出现明确异常。
+        不要编造新的指标或阈值，也不要直接判断根因。
+        只返回结构化对象。
+
+        故障现象：{symptom}
+        监控指标：{metrics}
+      analyze-recent-change: |
+        请只根据故障现象和最近变更整理需要核对的关联点。
+        返回AnalysisContent：items、conclusion、flagged。
+        items列出1到5条变更与故障之间值得核对的关系。
+        conclusion用一句完整中文说明这次变更是否值得优先排查，以中文句号结尾。
+        flagged表示是否存在值得优先核对的变更。
+        不能因为时间接近就把变更直接认定为根因。
+        只返回结构化对象。
+
+        故障现象：{symptom}
+        最近变更：{recentChange}
+      consolidate-report: |
+        请根据三类分析结果生成IncidentConclusion：
+        summary、probableCause、immediateActions、verificationSteps。
+        summary用一句完整中文概括当前判断，以中文句号结尾。
+        probableCause说明最可能的原因和判断依据，以中文句号结尾；
+        证据不足时要明确写“仍需验证”，不能写成已经确认。
+        immediateActions列出2到5个马上可以执行的处理动作，按顺序排列。
+        verificationSteps列出2到5个用于确认原因或验证恢复结果的检查项。
+        只能使用输入中的证据，不要虚构系统、命令、人员或指标阈值。
+        只返回结构化对象。
+
+        故障现象：{symptom}
+        三类分析结果：
+        {evidence}

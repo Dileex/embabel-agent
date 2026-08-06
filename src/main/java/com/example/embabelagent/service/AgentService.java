@@ -12,6 +12,10 @@ import com.embabel.agent.core.ProcessOptions;
 import com.embabel.agent.domain.io.UserInput;
 import com.example.embabelagent.agent.CodeReviewAgent.CodeFinding;
 import com.example.embabelagent.agent.CodeReviewAgent.CodeReviewReport;
+import com.example.embabelagent.agent.ParallelIncidentAgent;
+import com.example.embabelagent.agent.ParallelIncidentAgent.AnalysisPart;
+import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentAnalysisReport;
+import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentRequest;
 import com.example.embabelagent.agent.QuizAgent.QuizPack;
 import com.example.embabelagent.agent.QuizAgent.QuizQuestion;
 import com.example.embabelagent.dto.AgentResponse;
@@ -84,6 +88,22 @@ public class AgentService {
         return response("open", execution.getAgentProcess(), output);
     }
 
+    public AgentResponse parallel(String message) {
+        IncidentRequest request =
+                ParallelIncidentAgent.parseIncidentRequest(message);
+        AgentInvocation<IncidentAnalysisReport> invocation =
+                AgentInvocation.create(
+                        agentPlatform,
+                        IncidentAnalysisReport.class);
+        AgentProcess process =
+                invocation.run(
+                        request);
+        IncidentAnalysisReport output =
+                process.last(IncidentAnalysisReport.class);
+        validateOutput(output);
+        return response("parallel", process, output);
+    }
+
     private AgentResponse response(String mode, AgentProcess process, Object output) {
         String goalName = process.getGoal() == null ? null : process.getGoal().getName();
         return new AgentResponse(
@@ -107,7 +127,66 @@ public class AgentService {
             requireCodeFindings(report.findings());
             return;
         }
+        if (output instanceof IncidentAnalysisReport report) {
+            requireCompleteSentence(
+                    report.summary(),
+                    "IncidentAnalysisReport.summary");
+            requireCompleteSentence(
+                    report.probableCause(),
+                    "IncidentAnalysisReport.probableCause");
+            requireTextList(
+                    report.logFindings(),
+                    "IncidentAnalysisReport.logFindings");
+            requireTextList(
+                    report.metricFindings(),
+                    "IncidentAnalysisReport.metricFindings");
+            requireTextList(
+                    report.recentChangeFindings(),
+                    "IncidentAnalysisReport.recentChangeFindings");
+            requireTextList(
+                    report.immediateActions(),
+                    "IncidentAnalysisReport.immediateActions");
+            requireTextList(
+                    report.verificationSteps(),
+                    "IncidentAnalysisReport.verificationSteps");
+            requireAnalysisParts(report.parts());
+            if (report.execution().parallelWallClockMillis() <= 0
+                    || report.execution().summedTaskMillis() <= 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned invalid parallel timing");
+            }
+            return;
+        }
         throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unsupported agent output type");
+    }
+
+    private void requireAnalysisParts(List<AnalysisPart> parts) {
+        if (parts == null || parts.size() != 3) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Agent returned invalid parallel parts");
+        }
+        for (int index = 0; index < parts.size(); index++) {
+            AnalysisPart part = parts.get(index);
+            String prefix =
+                    "IncidentAnalysisReport.parts[" + index + "]";
+            if (part.task() == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned null field: " + prefix + ".task");
+            }
+            requireTextList(part.items(), prefix + ".items");
+            requireCompleteSentence(
+                    part.conclusion(),
+                    prefix + ".conclusion");
+            requireText(part.threadName(), prefix + ".threadName");
+            if (part.finishedAt() < part.startedAt()) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned invalid timing: " + prefix);
+            }
+        }
     }
 
     private void requireCodeFindings(List<CodeFinding> findings) {
@@ -177,6 +256,19 @@ public class AgentService {
         String text = value.strip();
         if (!text.matches(".*[。！？.!?]$")) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Agent returned incomplete field: " + fieldName);
+        }
+    }
+
+    private void requireTextList(
+            List<String> values,
+            String fieldName) {
+        if (values == null || values.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Agent returned invalid list: " + fieldName);
+        }
+        for (int index = 0; index < values.size(); index++) {
+            requireText(values.get(index), fieldName + "[" + index + "]");
         }
     }
 
