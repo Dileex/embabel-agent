@@ -7,5 +7,6 @@ public record ParallelIncidentAgentProperties(
         String analyzeLogs,
         String analyzeMetrics,
         String analyzeRecentChange,
-        String consolidateReport) {
+        String consolidateReport,
+        String evaluateReport) {
 }

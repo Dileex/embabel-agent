@@ -8,6 +8,8 @@ import com.embabel.agent.api.common.SupplierActionContext;
 import com.embabel.agent.api.common.TransformationActionContext;
 import com.embabel.agent.api.common.workflow.control.ResultList;
 import com.embabel.agent.api.common.workflow.control.ScatterGatherBuilder;
+import com.embabel.agent.api.common.workflow.loop.RepeatUntilActionContext;
+import com.embabel.agent.api.common.workflow.loop.RepeatUntilBuilder;
 import com.example.embabelagent.config.ParallelIncidentAgentProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -56,16 +58,32 @@ public class ParallelIncidentAgent {
                         request,
                         taskContext));
 
-        return ScatterGatherBuilder
-                .returning(IncidentAnalysisReport.class)
+        IncidentEvidence evidence = ScatterGatherBuilder
+                .returning(IncidentEvidence.class)
                 .fromElements(AnalysisPart.class)
                 .withGenerators(tasks)
                 .consolidatedBy(joinContext ->
-                        consolidate(
-                                request,
+                        collectEvidence(
                                 joinContext.getInput().getResults(),
                                 joinContext))
                 .asSubProcess(context);
+
+        ReviewedIncidentReport reviewed = RepeatUntilBuilder
+                .returning(ReviewedIncidentReport.class)
+                .consuming(IncidentRequest.class)
+                .withMaxIterations(3)
+                .repeating(loopContext ->
+                        generateAndEvaluate(
+                                request,
+                                evidence,
+                                loopContext))
+                .until(loopContext ->
+                        loopContext.lastAttempt() != null
+                                && loopContext
+                                        .lastAttempt()
+                                        .qualityScore() >= 0.9)
+                .asSubProcess(context);
+        return reviewed.report();
     }
 
     public static IncidentRequest parseIncidentRequest(String rawMessage) {
@@ -74,7 +92,15 @@ public class ParallelIncidentAgent {
                 readSection(message, "故障现象：", "监控指标："),
                 readSection(message, "监控指标：", "最近变更："),
                 readSection(message, "最近变更：", "日志片段："),
-                readSection(message, "日志片段：", null));
+                readSection(
+                        message,
+                        "日志片段：",
+                        message.contains("质量要求：")
+                                ? "质量要求："
+                                : null),
+                message.contains("质量要求：")
+                        ? readSection(message, "质量要求：", null)
+                        : "没有额外质量要求");
     }
 
     private AnalysisPart analyzePart(
@@ -100,12 +126,11 @@ public class ParallelIncidentAgent {
                 threadName);
     }
 
-    private IncidentAnalysisReport consolidate(
-            IncidentRequest request,
+    private IncidentEvidence collectEvidence(
             List<AnalysisPart> parts,
             TransformationActionContext<
                     ResultList<AnalysisPart>,
-                    IncidentAnalysisReport> context) {
+                    IncidentEvidence> context) {
         Map<AnalysisTask, AnalysisPart> byTask =
                 new EnumMap<>(AnalysisTask.class);
         for (AnalysisPart part : parts) {
@@ -117,25 +142,96 @@ public class ParallelIncidentAgent {
         AnalysisPart recentChange =
                 requirePart(byTask, AnalysisTask.RECENT_CHANGE);
 
+        return new IncidentEvidence(
+                List.of(logs, metrics, recentChange),
+                summarizeExecution(parts));
+    }
+
+    private ReviewedIncidentReport generateAndEvaluate(
+            IncidentRequest request,
+            IncidentEvidence evidence,
+            RepeatUntilActionContext<
+                    IncidentRequest,
+                    ReviewedIncidentReport> context) {
+        int attempt = context.getHistory().attemptCount() + 1;
+        String previousFeedback = context.lastAttempt() == null
+                ? "首次生成"
+                : String.join(
+                        "；",
+                        context.lastAttempt().qualityIssues());
         IncidentConclusion conclusion = context.ai()
                 .withDefaultLlm()
                 .createObject(
                         properties.consolidateReport()
                                 .replace("{symptom}", request.symptom())
-                                .replace("{evidence}", renderEvidence(parts)),
+                                .replace(
+                                        "{evidence}",
+                                        renderEvidence(evidence.parts()))
+                                .replace(
+                                        "{qualityRequirement}",
+                                        request.qualityRequirement())
+                                .replace(
+                                        "{feedback}",
+                                        previousFeedback),
                         IncidentConclusion.class);
 
-        return new IncidentAnalysisReport(
+        IncidentAnalysisReport draft = new IncidentAnalysisReport(
                 request.symptom(),
                 conclusion.summary(),
                 conclusion.probableCause(),
-                logs.items(),
-                metrics.items(),
-                recentChange.items(),
+                requirePart(
+                        evidence.parts(),
+                        AnalysisTask.LOG).items(),
+                requirePart(
+                        evidence.parts(),
+                        AnalysisTask.METRICS).items(),
+                requirePart(
+                        evidence.parts(),
+                        AnalysisTask.RECENT_CHANGE).items(),
                 conclusion.immediateActions(),
                 conclusion.verificationSteps(),
-                parts,
-                summarizeExecution(parts));
+                evidence.parts(),
+                evidence.execution(),
+                attempt,
+                previousFeedback,
+                0.0,
+                List.of("等待评估"));
+        ReportEvaluation evaluation = context.ai()
+                .withDefaultLlm()
+                .createObject(
+                        properties.evaluateReport()
+                                .replace("{symptom}", request.symptom())
+                                .replace(
+                                        "{qualityRequirement}",
+                                        request.qualityRequirement())
+                                .replace(
+                                        "{evidence}",
+                                        renderEvidence(evidence.parts()))
+                                .replace(
+                                        "{report}",
+                                        renderReport(draft)),
+                        ReportEvaluation.class);
+        double score = Math.max(0.0, Math.min(1.0, evaluation.score()));
+        IncidentAnalysisReport evaluatedReport =
+                new IncidentAnalysisReport(
+                        draft.symptom(),
+                        draft.summary(),
+                        draft.probableCause(),
+                        draft.logFindings(),
+                        draft.metricFindings(),
+                        draft.recentChangeFindings(),
+                        draft.immediateActions(),
+                        draft.verificationSteps(),
+                        draft.parts(),
+                        draft.execution(),
+                        draft.generationAttempt(),
+                        draft.revisionFeedback(),
+                        score,
+                        evaluation.issues());
+        return new ReviewedIncidentReport(
+                evaluatedReport,
+                score,
+                evaluation.issues());
     }
 
     private static String fillRequest(
@@ -161,6 +257,19 @@ public class ParallelIncidentAgent {
                         part.conclusion(),
                         part.flagged()))
                 .collect(Collectors.joining("\n"));
+    }
+
+    private static String renderReport(IncidentAnalysisReport report) {
+        return """
+                总结：%s
+                可能原因：%s
+                立即处理：%s
+                验证步骤：%s
+                """.formatted(
+                report.summary(),
+                report.probableCause(),
+                String.join("；", report.immediateActions()),
+                String.join("；", report.verificationSteps()));
     }
 
     private static ExecutionSummary summarizeExecution(
@@ -191,6 +300,17 @@ public class ParallelIncidentAgent {
                     "Missing parallel incident part: " + task);
         }
         return part;
+    }
+
+    private static AnalysisPart requirePart(
+            List<AnalysisPart> parts,
+            AnalysisTask task) {
+        return parts.stream()
+                .filter(part -> part.task() == task)
+                .findFirst()
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "Missing parallel incident part: " + task));
     }
 
     private static boolean hasOverlap(List<AnalysisPart> parts) {
@@ -253,7 +373,8 @@ public class ParallelIncidentAgent {
             @NotBlank String symptom,
             @NotBlank String metrics,
             @NotBlank String recentChange,
-            @NotBlank String logs) {
+            @NotBlank String logs,
+            @NotBlank String qualityRequirement) {
     }
 
     public record AnalysisContent(
@@ -283,6 +404,22 @@ public class ParallelIncidentAgent {
             @NotEmpty List<@NotBlank String> verificationSteps) {
     }
 
+    public record ReportEvaluation(
+            double score,
+            @NotEmpty List<@NotBlank String> issues) {
+    }
+
+    public record ReviewedIncidentReport(
+            @Valid @NotNull IncidentAnalysisReport report,
+            double qualityScore,
+            @NotEmpty List<@NotBlank String> qualityIssues) {
+    }
+
+    public record IncidentEvidence(
+            @NotEmpty List<@Valid AnalysisPart> parts,
+            @Valid @NotNull ExecutionSummary execution) {
+    }
+
     public record ExecutionSummary(
             long parallelWallClockMillis,
             long summedTaskMillis,
@@ -301,6 +438,10 @@ public class ParallelIncidentAgent {
             @NotEmpty
             @Size(min = 3, max = 3)
             List<@Valid AnalysisPart> parts,
-            @Valid @NotNull ExecutionSummary execution) {
+            @Valid @NotNull ExecutionSummary execution,
+            int generationAttempt,
+            @NotBlank String revisionFeedback,
+            double qualityScore,
+            @NotEmpty List<@NotBlank String> qualityIssues) {
     }
 }

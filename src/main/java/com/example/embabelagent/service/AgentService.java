@@ -149,7 +149,17 @@ public class AgentService {
             requireTextList(
                     report.verificationSteps(),
                     "IncidentAnalysisReport.verificationSteps");
+            requireTextList(
+                    report.qualityIssues(),
+                    "IncidentAnalysisReport.qualityIssues");
             requireAnalysisParts(report.parts());
+            if (report.generationAttempt() <= 0
+                    || report.qualityScore() < 0
+                    || report.qualityScore() > 1) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned invalid quality evaluation");
+            }
             if (report.execution().parallelWallClockMillis() <= 0
                     || report.execution().summedTaskMillis() <= 0) {
                 throw new ResponseStatusException(
