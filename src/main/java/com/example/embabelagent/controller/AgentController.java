@@ -45,4 +45,10 @@ public class AgentController {
         return agentService.parallel(request.message());
     }
 
+    @PostMapping("/video-plan")
+    public AgentResponse videoPlan(
+            @Valid @RequestBody AgentRequest request) {
+        return agentService.videoPlan(request.message());
+    }
+
 }

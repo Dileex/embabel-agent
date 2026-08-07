@@ -136,3 +136,63 @@ demo:
         {evidence}
         待评估报告：
         {report}
+  commercial-video-agent:
+    prompts:
+      prepare-brief: |
+        请根据输入整理ProductBrief：
+        productName、audience、platform、durationSeconds、
+        sellingPoints、factualBoundaries。
+        sellingPoints列出3到5条可以用于视频表达的商品卖点。
+        factualBoundaries列出2到5条不能超出商品资料的事实边界。
+        只能使用商品资料中已经给出的信息，不要补充功效、认证、销量或价格。
+        只返回结构化对象。
+
+        商品名称：{productName}
+        商品资料：{productFacts}
+        目标人群：{audience}
+        发布平台：{platform}
+        视频时长：{durationSeconds}秒
+      write-script: |
+        请根据商品简报生成VideoScript：
+        hook、voiceover、closing、onScreenTexts。
+        hook用于视频开头吸引目标人群，但不能制造焦虑或夸大商品作用。
+        voiceover是一段完整中文口播，适合目标时长。
+        closing给出自然收尾，不写虚假的限时、库存或销量信息。
+        onScreenTexts列出3到6条适合画面展示的短字幕。
+        只能使用商品简报里的事实和卖点。
+        只返回结构化对象。
+
+        商品简报：
+        {brief}
+      create-storyboard: |
+        请把商品简报和视频脚本拆成Storyboard。
+        shots按播放顺序排列，每个Shot包含：
+        sequence、durationSeconds、visual、voiceover、
+        caption、requiredMaterial。
+        每个镜头至少1秒，全部镜头时长相加必须等于目标时长。
+        visual描述要拍什么，requiredMaterial说明需要哪类商品素材。
+        不能增加商品简报中没有的商品事实。
+        只返回结构化对象。
+
+        目标时长：{durationSeconds}秒
+        商品简报：
+        {brief}
+        视频脚本：
+        {script}
+      review-plan: |
+        请检查商业视频方案，返回PlanReview：ready、issues。
+        检查商品事实是否超出简报、脚本和分镜是否一致、
+        镜头总时长是否符合目标时长、每个镜头是否写清素材要求。
+        全部满足时ready为true，issues填写“没有需要修正的问题”。
+        存在问题时ready为false，issues列出具体问题。
+        只检查，不要重写脚本或分镜。
+        只返回结构化对象。
+
+        目标时长：{expectedDuration}秒
+        分镜总时长：{actualDuration}秒
+        商品简报：
+        {brief}
+        视频脚本：
+        {script}
+        分镜：
+        {storyboard}

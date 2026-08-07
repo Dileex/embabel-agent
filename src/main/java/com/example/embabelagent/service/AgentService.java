@@ -12,6 +12,10 @@ import com.embabel.agent.core.ProcessOptions;
 import com.embabel.agent.domain.io.UserInput;
 import com.example.embabelagent.agent.CodeReviewAgent.CodeFinding;
 import com.example.embabelagent.agent.CodeReviewAgent.CodeReviewReport;
+import com.example.embabelagent.agent.CommercialVideoAgent;
+import com.example.embabelagent.agent.CommercialVideoAgent.CommercialVideoPlan;
+import com.example.embabelagent.agent.CommercialVideoAgent.CommercialVideoRequest;
+import com.example.embabelagent.agent.CommercialVideoAgent.Shot;
 import com.example.embabelagent.agent.ParallelIncidentAgent;
 import com.example.embabelagent.agent.ParallelIncidentAgent.AnalysisPart;
 import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentAnalysisReport;
@@ -104,6 +108,20 @@ public class AgentService {
         return response("parallel", process, output);
     }
 
+    public AgentResponse videoPlan(String message) {
+        CommercialVideoRequest request =
+                CommercialVideoAgent.parseRequest(message);
+        AgentInvocation<CommercialVideoPlan> invocation =
+                AgentInvocation.create(
+                        agentPlatform,
+                        CommercialVideoPlan.class);
+        AgentProcess process = invocation.run(request);
+        CommercialVideoPlan output =
+                process.last(CommercialVideoPlan.class);
+        validateOutput(output);
+        return response("video-plan", process, output);
+    }
+
     private AgentResponse response(String mode, AgentProcess process, Object output) {
         String goalName = process.getGoal() == null ? null : process.getGoal().getName();
         return new AgentResponse(
@@ -168,7 +186,82 @@ public class AgentService {
             }
             return;
         }
+        if (output instanceof CommercialVideoPlan plan) {
+            requireText(
+                    plan.brief().productName(),
+                    "CommercialVideoPlan.brief.productName");
+            requireTextList(
+                    plan.brief().sellingPoints(),
+                    "CommercialVideoPlan.brief.sellingPoints");
+            requireTextList(
+                    plan.brief().factualBoundaries(),
+                    "CommercialVideoPlan.brief.factualBoundaries");
+            requireText(
+                    plan.script().hook(),
+                    "CommercialVideoPlan.script.hook");
+            requireText(
+                    plan.script().voiceover(),
+                    "CommercialVideoPlan.script.voiceover");
+            requireTextList(
+                    plan.script().onScreenTexts(),
+                    "CommercialVideoPlan.script.onScreenTexts");
+            requireShots(plan.storyboard().shots());
+            requireTextList(
+                    plan.review().issues(),
+                    "CommercialVideoPlan.review.issues");
+            requireTextList(
+                    plan.completedStages(),
+                    "CommercialVideoPlan.completedStages");
+            List<String> expectedStages = List.of(
+                    "商品资料已整理",
+                    "视频脚本已生成",
+                    "视频分镜已拆分",
+                    "制作方案已检查");
+            if (!expectedStages.equals(
+                    plan.completedStages())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned invalid video stages");
+            }
+            int calculatedDuration =
+                    plan.storyboard().shots().stream()
+                            .mapToInt(Shot::durationSeconds)
+                            .sum();
+            if (calculatedDuration
+                    != plan.totalDurationSeconds()) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned invalid video duration");
+            }
+            return;
+        }
         throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unsupported agent output type");
+    }
+
+    private void requireShots(List<Shot> shots) {
+        if (shots == null || shots.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Agent returned empty storyboard");
+        }
+        for (int index = 0; index < shots.size(); index++) {
+            Shot shot = shots.get(index);
+            String prefix =
+                    "CommercialVideoPlan.storyboard.shots["
+                            + index + "]";
+            if (shot.sequence() <= 0
+                    || shot.durationSeconds() <= 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned invalid shot: " + prefix);
+            }
+            requireText(shot.visual(), prefix + ".visual");
+            requireText(shot.voiceover(), prefix + ".voiceover");
+            requireText(shot.caption(), prefix + ".caption");
+            requireText(
+                    shot.requiredMaterial(),
+                    prefix + ".requiredMaterial");
+        }
     }
 
     private void requireAnalysisParts(List<AnalysisPart> parts) {
