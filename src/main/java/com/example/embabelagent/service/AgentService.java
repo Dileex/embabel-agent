@@ -27,6 +27,9 @@ import com.example.embabelagent.agent.ProductToolAgent.ProductBusinessAnswer;
 import com.example.embabelagent.agent.ProductToolAgent.ProductBusinessQuestion;
 import com.example.embabelagent.agent.RemotePlatformToolAgent;
 import com.example.embabelagent.agent.RemotePlatformToolAgent.ProductPublishRequest;
+import com.example.embabelagent.agent.ProductSkillAgent;
+import com.example.embabelagent.agent.ProductSkillAgent.ProductCopyRequest;
+import com.example.embabelagent.agent.ProductSkillAgent.SkillProductCopyResult;
 import com.example.embabelagent.agent.RemotePlatformToolAgent.RemotePlatformPublishAssessment;
 import com.example.embabelagent.agent.QuizAgent.QuizPack;
 import com.example.embabelagent.agent.QuizAgent.QuizQuestion;
@@ -216,6 +219,25 @@ public class AgentService {
                 output);
     }
 
+    public AgentResponse skillCopy(
+            String message) {
+        ProductCopyRequest request =
+                new ProductCopyRequest(message.strip());
+        AgentInvocation<SkillProductCopyResult> invocation =
+                AgentInvocation.create(
+                        agentPlatform,
+                        SkillProductCopyResult.class);
+        AgentProcess process = invocation.run(request);
+        SkillProductCopyResult output =
+                process.last(
+                        SkillProductCopyResult.class);
+        validateOutput(output);
+        return response(
+                "skill-copy",
+                process,
+                output);
+    }
+
     private AgentResponse response(String mode, AgentProcess process, Object output) {
         String goalName = process.getGoal() == null ? null : process.getGoal().getName();
         return new AgentResponse(
@@ -390,6 +412,75 @@ public class AgentService {
                     assessment.decision()
                             .platformRuleVersion(),
                     "RemotePlatformPublishAssessment.decision.platformRuleVersion");
+            return;
+        }
+        if (output instanceof SkillProductCopyResult result) {
+            requireText(
+                    result.draft().title(),
+                    "SkillProductCopyResult.draft.title");
+            requireText(
+                    result.draft().opening(),
+                    "SkillProductCopyResult.draft.opening");
+            requireText(
+                    result.draft().voiceover(),
+                    "SkillProductCopyResult.draft.voiceover");
+            requireTextList(
+                    result.draft().onScreenTexts(),
+                    "SkillProductCopyResult.draft.onScreenTexts");
+            List<String> rejectedClaims =
+                    result.draft().rejectedClaims();
+            if (rejectedClaims == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned null field: "
+                                + "SkillProductCopyResult.draft.rejectedClaims");
+            }
+            for (int index = 0;
+                    index < rejectedClaims.size();
+                    index++) {
+                requireText(
+                        rejectedClaims.get(index),
+                        "SkillProductCopyResult.draft.rejectedClaims["
+                                + index + "]");
+            }
+            if (!"product-video-copy".equals(
+                    result.draft().skillName())
+                    || !"copy-rule-2026-08".equals(
+                            result.draft().ruleVersion())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent did not use the expected skill rules");
+            }
+            Set<String> calledTools =
+                    new HashSet<>(
+                            result.calledSkillTools());
+            if (!calledTools.contains(
+                    "product_video_copy")
+                    || !calledTools.contains(
+                            "readResource")) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent did not activate the skill and read its reference");
+            }
+            String publishableCopy = String.join(
+                    "\n",
+                    result.draft().title(),
+                    result.draft().opening(),
+                    result.draft().voiceover(),
+                    String.join(
+                            "\n",
+                            result.draft().onScreenTexts()));
+            List<String> forbiddenClaims = List.of(
+                    "全网第一",
+                    "完全防水",
+                    "销量第一",
+                    "比一瓶水");
+            if (forbiddenClaims.stream()
+                    .anyMatch(publishableCopy::contains)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent kept a rejected claim in publishable copy");
+            }
             return;
         }
         throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unsupported agent output type");

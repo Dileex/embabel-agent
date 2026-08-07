@@ -296,3 +296,23 @@ demo:
         店铺ID：{storeId}
         发布平台：{platform}
         视频时长：{durationSeconds}秒
+  product-skill-agent:
+    skill-path: skills/product-video-copy
+    prompts:
+      create-copy: |
+        请根据用户任务生成ProductCopyDraft：
+        title、opening、voiceover、onScreenTexts、
+        rejectedClaims、skillName、ruleVersion。
+
+        先检查当前可用的Skill。
+        如果有适合商品短视频文案的Skill，
+        必须先激活它，再读取Skill要求使用的参考资料。
+        文案只能使用用户已经确认的商品信息。
+        不要把重量、容量等数据改写成用户没有提供的参照比较。
+        用户提出但不能使用的说法放进rejectedClaims，
+        不要继续写进title、opening、voiceover或onScreenTexts。
+        skillName和ruleVersion必须来自Skill及其参考资料。
+        只返回结构化对象。
+
+        用户任务：
+        {request}

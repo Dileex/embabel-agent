@@ -83,4 +83,11 @@ public class AgentController {
                 request.message());
     }
 
+    @PostMapping("/skill-copy")
+    public AgentResponse skillCopy(
+            @Valid @RequestBody AgentRequest request) {
+        return agentService.skillCopy(
+                request.message());
+    }
+
 }
