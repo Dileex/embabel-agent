@@ -71,6 +71,12 @@ public class ProductBusinessTools {
                 platformSpecs);
     }
 
+    public LocalProductQueryTools localForTenant(
+            String tenantId) {
+        return new LocalProductQueryTools(
+                forTenant(tenantId));
+    }
+
     public void validateTenantAccess(String tenantId) {
         if (!DEMO_TENANT.equals(tenantId)) {
             throw new ResponseStatusException(
@@ -187,20 +193,65 @@ public class ProductBusinessTools {
             }
         }
 
-        private static <T> T requireValue(
-                Map<String, T> values,
-                String key,
-                String message) {
-            if (key == null || key.isBlank()) {
-                throw new IllegalArgumentException(
-                        "查询参数不能为空");
-            }
-            T value = values.get(key.strip());
-            if (value == null) {
-                throw new IllegalArgumentException(message);
-            }
-            return value;
+    }
+
+    public static final class LocalProductQueryTools {
+
+        private final ProductQueryTools delegate;
+
+        private LocalProductQueryTools(
+                ProductQueryTools delegate) {
+            this.delegate = delegate;
         }
+
+        @LlmTool(
+                name = "query_product",
+                description = "按商品ID查询商品名称、状态和已确认卖点")
+        public ProductInfo queryProduct(
+                @LlmTool.Param(
+                        description = "业务系统中的商品ID")
+                String productId) {
+            return delegate.queryProduct(productId);
+        }
+
+        @LlmTool(
+                name = "query_inventory_price",
+                description = "按商品ID查询可售库存和当前销售价格")
+        public InventoryPrice queryInventoryPrice(
+                @LlmTool.Param(
+                        description = "业务系统中的商品ID")
+                String productId) {
+            return delegate.queryInventoryPrice(productId);
+        }
+
+        @LlmTool(
+                name = "query_store",
+                description = "按店铺ID查询店铺状态和允许发布的平台")
+        public StoreInfo queryStore(
+                @LlmTool.Param(
+                        description = "业务系统中的店铺ID")
+                String storeId) {
+            return delegate.queryStore(storeId);
+        }
+
+        public List<String> calledTools() {
+            return delegate.calledTools();
+        }
+    }
+
+    private static <T> T requireValue(
+            Map<String, T> values,
+            String key,
+            String message) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException(
+                    "查询参数不能为空");
+        }
+        T value = values.get(key.strip());
+        if (value == null) {
+            throw new IllegalArgumentException(message);
+        }
+        return value;
     }
 
     public record ProductInfo(

@@ -1,3 +1,18 @@
+spring:
+  ai:
+    mcp:
+      client:
+        enabled: true
+        name: embabel-product-agent
+        version: 1.0.0
+        request-timeout: 5s
+        type: SYNC
+        streamable-http:
+          connections:
+            platform-rules:
+              url: http://localhost:8081
+              endpoint: /mcp
+
 embabel:
   models:
     default-llm: deepseek-v4-flash
@@ -10,6 +25,13 @@ embabel:
             api-key: ${DEEPSEEK_API_KEY}
             base-url: https://api.deepseek.com
             models: deepseek-v4-flash
+      tools:
+        includes:
+          platform-rules:
+            description: 查询远程平台的商品视频发布规则
+            provider: platform-rules-mcp
+            tools:
+              - query_platform_rule
 
 spring:
   ai:
@@ -243,3 +265,32 @@ demo:
 
         检索到的资料：
         {evidence}
+  remote-platform-agent:
+    prompts:
+      check-publish-readiness: |
+        请判断商品视频是否具备发布条件，
+        返回RemotePublishDecision：
+        publishable、conclusion、evidence、blockers、
+        platformRuleSource、platformRuleVersion。
+
+        你可以使用本地商品、库存价格、店铺查询工具，
+        以及远程平台规则查询工具query_platform_rule。
+        必须调用这四个工具后再判断，不能根据常识补充数据。
+
+        判断规则：
+        商品必须处于ON_SALE状态；
+        可售库存必须大于0；
+        店铺必须启用，并且允许发布到目标平台；
+        视频时长不能超过远程平台规则给出的上限；
+        商品价格和平台必填信息必须能从工具结果中找到。
+
+        platformRuleSource和platformRuleVersion
+        必须原样填写远程平台规则工具返回的值。
+        evidence列出4到7条工具返回的事实。
+        没有阻塞项时，blockers填写“没有阻塞项”。
+        只返回结构化对象。
+
+        商品ID：{productId}
+        店铺ID：{storeId}
+        发布平台：{platform}
+        视频时长：{durationSeconds}秒

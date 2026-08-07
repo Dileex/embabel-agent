@@ -23,9 +23,11 @@ import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentRequest;
 import com.example.embabelagent.agent.ProductKnowledgeAgent;
 import com.example.embabelagent.agent.ProductKnowledgeAgent.ProductKnowledgeAnswer;
 import com.example.embabelagent.agent.ProductKnowledgeAgent.ProductKnowledgeQuestion;
-import com.example.embabelagent.agent.ProductToolAgent;
 import com.example.embabelagent.agent.ProductToolAgent.ProductBusinessAnswer;
 import com.example.embabelagent.agent.ProductToolAgent.ProductBusinessQuestion;
+import com.example.embabelagent.agent.RemotePlatformToolAgent;
+import com.example.embabelagent.agent.RemotePlatformToolAgent.ProductPublishRequest;
+import com.example.embabelagent.agent.RemotePlatformToolAgent.RemotePlatformPublishAssessment;
 import com.example.embabelagent.agent.QuizAgent.QuizPack;
 import com.example.embabelagent.agent.QuizAgent.QuizQuestion;
 import com.example.embabelagent.dto.AgentResponse;
@@ -181,6 +183,30 @@ public class AgentService {
                 output);
     }
 
+    public AgentResponse mcpPublishCheck(
+            String tenantId,
+            String message) {
+        productBusinessTools.validateTenantAccess(
+                tenantId);
+        ProductPublishRequest request =
+                RemotePlatformToolAgent.parseRequest(
+                        message,
+                        tenantId);
+        AgentInvocation<RemotePlatformPublishAssessment> invocation =
+                AgentInvocation.create(
+                        agentPlatform,
+                        RemotePlatformPublishAssessment.class);
+        AgentProcess process = invocation.run(request);
+        RemotePlatformPublishAssessment output =
+                process.last(
+                        RemotePlatformPublishAssessment.class);
+        validateOutput(output);
+        return response(
+                "mcp-publish-check",
+                process,
+                output);
+    }
+
     private AgentResponse response(String mode, AgentProcess process, Object output) {
         String goalName = process.getGoal() == null ? null : process.getGoal().getName();
         return new AgentResponse(
@@ -321,6 +347,40 @@ public class AgentService {
                         HttpStatus.BAD_GATEWAY,
                         "Agent returned evidence for an unanswered question");
             }
+            return;
+        }
+        if (output instanceof RemotePlatformPublishAssessment assessment) {
+            requireText(
+                    assessment.decision().conclusion(),
+                    "RemotePlatformPublishAssessment.decision.conclusion");
+            requireTextList(
+                    assessment.decision().evidence(),
+                    "RemotePlatformPublishAssessment.decision.evidence");
+            requireTextList(
+                    assessment.decision().blockers(),
+                    "RemotePlatformPublishAssessment.decision.blockers");
+            Set<String> expectedLocalTools = Set.of(
+                    "query_product",
+                    "query_inventory_price",
+                    "query_store");
+            if (!expectedLocalTools.equals(
+                    new HashSet<>(
+                            assessment.localCalledTools()))) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent did not query all required local data");
+            }
+            if (!"platform-rules-mcp".equals(
+                    assessment.decision()
+                            .platformRuleSource())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent did not use the remote platform rule");
+            }
+            requireText(
+                    assessment.decision()
+                            .platformRuleVersion(),
+                    "RemotePlatformPublishAssessment.decision.platformRuleVersion");
             return;
         }
         throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unsupported agent output type");

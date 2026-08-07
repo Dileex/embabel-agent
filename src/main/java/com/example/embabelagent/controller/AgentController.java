@@ -71,4 +71,16 @@ public class AgentController {
                 request.message());
     }
 
+    @PostMapping("/mcp-publish-check")
+    public AgentResponse mcpPublishCheck(
+            @RequestHeader(
+                    name = "X-Tenant-Id",
+                    defaultValue = "tenant-demo")
+            String tenantId,
+            @Valid @RequestBody AgentRequest request) {
+        return agentService.mcpPublishCheck(
+                tenantId,
+                request.message());
+    }
+
 }
