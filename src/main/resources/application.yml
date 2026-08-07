@@ -216,3 +216,20 @@ demo:
 
         用户问题：
         {question}
+  product-knowledge-agent:
+    prompts:
+      answer-with-evidence: |
+        请只根据检索到的资料回答商品内容问题。
+        返回KnowledgeDraft，其中answer使用中文完整回答。
+
+        先说明哪些卖点可以使用，再说明哪些表达不能使用，
+        最后给出适合目标平台的制作建议。
+        资料中没有出现的信息不要补充，也不要把推测写成事实。
+        只返回结构化对象。
+
+        商品ID：{productId}
+        发布平台：{platform}
+        问题：{question}
+
+        检索到的资料：
+        {evidence}

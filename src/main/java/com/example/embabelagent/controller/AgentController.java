@@ -64,4 +64,11 @@ public class AgentController {
                 request.message());
     }
 
+    @PostMapping("/product-knowledge")
+    public AgentResponse productKnowledge(
+            @Valid @RequestBody AgentRequest request) {
+        return agentService.productKnowledge(
+                request.message());
+    }
+
 }

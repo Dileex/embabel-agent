@@ -20,6 +20,9 @@ import com.example.embabelagent.agent.ParallelIncidentAgent;
 import com.example.embabelagent.agent.ParallelIncidentAgent.AnalysisPart;
 import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentAnalysisReport;
 import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentRequest;
+import com.example.embabelagent.agent.ProductKnowledgeAgent;
+import com.example.embabelagent.agent.ProductKnowledgeAgent.ProductKnowledgeAnswer;
+import com.example.embabelagent.agent.ProductKnowledgeAgent.ProductKnowledgeQuestion;
 import com.example.embabelagent.agent.ProductToolAgent;
 import com.example.embabelagent.agent.ProductToolAgent.ProductBusinessAnswer;
 import com.example.embabelagent.agent.ProductToolAgent.ProductBusinessQuestion;
@@ -158,6 +161,24 @@ public class AgentService {
                 output);
     }
 
+    public AgentResponse productKnowledge(
+            String message) {
+        ProductKnowledgeQuestion question =
+                ProductKnowledgeAgent.parseRequest(message);
+        AgentInvocation<ProductKnowledgeAnswer> invocation =
+                AgentInvocation.create(
+                        agentPlatform,
+                        ProductKnowledgeAnswer.class);
+        AgentProcess process = invocation.run(question);
+        ProductKnowledgeAnswer output =
+                process.last(ProductKnowledgeAnswer.class);
+        validateOutput(output);
+        return response(
+                "product-knowledge",
+                process,
+                output);
+    }
+
     private AgentResponse response(String mode, AgentProcess process, Object output) {
         String goalName = process.getGoal() == null ? null : process.getGoal().getName();
         return new AgentResponse(
@@ -275,6 +296,29 @@ public class AgentService {
             requireText(
                     answer.answer(),
                     "ProductBusinessAnswer.answer");
+            return;
+        }
+        if (output instanceof ProductKnowledgeAnswer answer) {
+            requireText(
+                    answer.answer(),
+                    "ProductKnowledgeAnswer.answer");
+            if (answer.found()) {
+                requireTextList(
+                        answer.citations(),
+                        "ProductKnowledgeAnswer.citations");
+                if (answer.retrievedChunks() == null
+                        || answer.retrievedChunks().isEmpty()) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_GATEWAY,
+                            "Agent returned no RAG evidence");
+                }
+            }
+            else if (!answer.citations().isEmpty()
+                    || !answer.retrievedChunks().isEmpty()) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned evidence for an unanswered question");
+            }
             return;
         }
         throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unsupported agent output type");
