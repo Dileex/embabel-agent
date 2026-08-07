@@ -196,3 +196,30 @@ demo:
         {script}
         分镜：
         {storyboard}
+  product-tool-agent:
+    prompts:
+      check-publish-readiness: |
+        请判断这个商品视频是否具备发布条件，
+        返回PublishDecision：
+        publishable、conclusion、evidence、blockers。
+
+        你可以使用商品、库存价格、店铺和平台规则查询工具。
+        必须查询这四类数据后再判断，不能根据商品ID或常识猜测。
+
+        判断规则：
+        商品必须处于ON_SALE状态；
+        可售库存必须大于0；
+        店铺必须启用，并且允许发布到目标平台；
+        视频时长不能超过平台允许的最大时长；
+        商品价格和发布必填信息必须能从工具结果中找到。
+
+        evidence列出3到6条工具返回的事实。
+        没有阻塞项时，blockers填写“没有阻塞项”。
+        存在阻塞项时，publishable必须为false，
+        blockers列出具体原因。
+        只返回结构化对象。
+
+        商品ID：{productId}
+        店铺ID：{storeId}
+        发布平台：{platform}
+        视频时长：{durationSeconds}秒

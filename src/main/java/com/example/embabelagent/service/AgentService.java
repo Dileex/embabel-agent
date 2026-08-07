@@ -20,9 +20,13 @@ import com.example.embabelagent.agent.ParallelIncidentAgent;
 import com.example.embabelagent.agent.ParallelIncidentAgent.AnalysisPart;
 import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentAnalysisReport;
 import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentRequest;
+import com.example.embabelagent.agent.ProductToolAgent;
+import com.example.embabelagent.agent.ProductToolAgent.ProductPublishAssessment;
+import com.example.embabelagent.agent.ProductToolAgent.ProductPublishRequest;
 import com.example.embabelagent.agent.QuizAgent.QuizPack;
 import com.example.embabelagent.agent.QuizAgent.QuizQuestion;
 import com.example.embabelagent.dto.AgentResponse;
+import com.example.embabelagent.tool.ProductBusinessTools;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +42,15 @@ public class AgentService {
 
     private final AgentPlatform agentPlatform;
 
-    public AgentService(Autonomy autonomy, AgentPlatform agentPlatform) {
+    private final ProductBusinessTools productBusinessTools;
+
+    public AgentService(
+            Autonomy autonomy,
+            AgentPlatform agentPlatform,
+            ProductBusinessTools productBusinessTools) {
         this.autonomy = autonomy;
         this.agentPlatform = agentPlatform;
+        this.productBusinessTools = productBusinessTools;
     }
 
     public AgentResponse focused(String message) {
@@ -120,6 +130,29 @@ public class AgentService {
                 process.last(CommercialVideoPlan.class);
         validateOutput(output);
         return response("video-plan", process, output);
+    }
+
+    public AgentResponse productPublishCheck(
+            String tenantId,
+            String message) {
+        // 权限在调用模型前检查，不能交给模型决定。
+        productBusinessTools.validateTenantAccess(tenantId);
+        ProductPublishRequest request =
+                ProductToolAgent.parseRequest(
+                        message,
+                        tenantId);
+        AgentInvocation<ProductPublishAssessment> invocation =
+                AgentInvocation.create(
+                        agentPlatform,
+                        ProductPublishAssessment.class);
+        AgentProcess process = invocation.run(request);
+        ProductPublishAssessment output =
+                process.last(ProductPublishAssessment.class);
+        validateOutput(output);
+        return response(
+                "product-publish-check",
+                process,
+                output);
     }
 
     private AgentResponse response(String mode, AgentProcess process, Object output) {
@@ -232,6 +265,30 @@ public class AgentService {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY,
                         "Agent returned invalid video duration");
+            }
+            return;
+        }
+        if (output instanceof ProductPublishAssessment assessment) {
+            requireText(
+                    assessment.decision().conclusion(),
+                    "ProductPublishAssessment.decision.conclusion");
+            requireTextList(
+                    assessment.decision().evidence(),
+                    "ProductPublishAssessment.decision.evidence");
+            requireTextList(
+                    assessment.decision().blockers(),
+                    "ProductPublishAssessment.decision.blockers");
+            Set<String> expectedTools = Set.of(
+                    "query_product",
+                    "query_inventory_price",
+                    "query_store",
+                    "query_platform_spec");
+            if (!expectedTools.equals(
+                    new HashSet<>(
+                            assessment.calledTools()))) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent did not query all required business data");
             }
             return;
         }

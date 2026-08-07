@@ -6,6 +6,7 @@ import com.example.embabelagent.service.AgentService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -49,6 +50,18 @@ public class AgentController {
     public AgentResponse videoPlan(
             @Valid @RequestBody AgentRequest request) {
         return agentService.videoPlan(request.message());
+    }
+
+    @PostMapping("/product-publish-check")
+    public AgentResponse productPublishCheck(
+            @RequestHeader(
+                    name = "X-Tenant-Id",
+                    defaultValue = "tenant-demo")
+            String tenantId,
+            @Valid @RequestBody AgentRequest request) {
+        return agentService.productPublishCheck(
+                tenantId,
+                request.message());
     }
 
 }
