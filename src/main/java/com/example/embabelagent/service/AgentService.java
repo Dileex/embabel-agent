@@ -23,6 +23,9 @@ import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentRequest;
 import com.example.embabelagent.agent.ProductKnowledgeAgent;
 import com.example.embabelagent.agent.ProductKnowledgeAgent.ProductKnowledgeAnswer;
 import com.example.embabelagent.agent.ProductKnowledgeAgent.ProductKnowledgeQuestion;
+import com.example.embabelagent.agent.ProductContentCoordinatorAgent;
+import com.example.embabelagent.agent.ProductContentCoordinatorAgent.ProductContentPlan;
+import com.example.embabelagent.agent.ProductContentCoordinatorAgent.ProductContentRequest;
 import com.example.embabelagent.agent.ProductToolAgent.ProductBusinessAnswer;
 import com.example.embabelagent.agent.ProductToolAgent.ProductBusinessQuestion;
 import com.example.embabelagent.agent.RemotePlatformToolAgent;
@@ -234,6 +237,26 @@ public class AgentService {
         validateOutput(output);
         return response(
                 "skill-copy",
+                process,
+                output);
+    }
+
+    public AgentResponse contentPlan(
+            String message) {
+        ProductContentRequest request =
+                ProductContentCoordinatorAgent.parseRequest(
+                        message);
+        AgentInvocation<ProductContentPlan> invocation =
+                AgentInvocation.create(
+                        agentPlatform,
+                        ProductContentPlan.class);
+        AgentProcess process = invocation.run(request);
+        ProductContentPlan output =
+                process.last(
+                        ProductContentPlan.class);
+        validateOutput(output);
+        return response(
+                "content-plan",
                 process,
                 output);
     }
@@ -480,6 +503,88 @@ public class AgentService {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_GATEWAY,
                         "Agent kept a rejected claim in publishable copy");
+            }
+            return;
+        }
+        if (output instanceof ProductContentPlan plan) {
+            requireText(
+                    plan.brief().productName(),
+                    "ProductContentPlan.brief.productName");
+            requireTextList(
+                    plan.brief().confirmedFacts(),
+                    "ProductContentPlan.brief.confirmedFacts");
+            requireTextList(
+                    plan.brief().sellingPoints(),
+                    "ProductContentPlan.brief.sellingPoints");
+            requireTextList(
+                    plan.brief().factualBoundaries(),
+                    "ProductContentPlan.brief.factualBoundaries");
+            requireText(
+                    plan.copyWork().draft().title(),
+                    "ProductContentPlan.copyWork.draft.title");
+            requireTextList(
+                    plan.copyWork().draft().sellingPoints(),
+                    "ProductContentPlan.copyWork.draft.sellingPoints");
+            requireText(
+                    plan.copyWork().draft().videoScript(),
+                    "ProductContentPlan.copyWork.draft.videoScript");
+            requireTextList(
+                    plan.copyWork().draft().onScreenTexts(),
+                    "ProductContentPlan.copyWork.draft.onScreenTexts");
+            requireTextList(
+                    plan.review().checkedFacts(),
+                    "ProductContentPlan.review.checkedFacts");
+            requireTextList(
+                    plan.review().issues(),
+                    "ProductContentPlan.review.issues");
+            List<String> expectedSteps = List.of(
+                    "商品分析Agent已完成",
+                    "文案Agent已完成",
+                    "质检Agent已完成");
+            if (!expectedSteps.equals(
+                    plan.collaborationSteps())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned invalid collaboration steps");
+            }
+            Set<String> calledTools =
+                    new HashSet<>(
+                            plan.copyWork()
+                                    .calledSkillTools());
+            if (!calledTools.contains(
+                    "product_video_copy")
+                    || !calledTools.contains(
+                            "readResource")) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Copy agent did not use the product content skill");
+            }
+            String publishableCopy = String.join(
+                    "\n",
+                    plan.copyWork().draft().title(),
+                    String.join(
+                            "\n",
+                            plan.copyWork().draft().sellingPoints()),
+                    plan.copyWork().draft().videoScript(),
+                    String.join(
+                            "\n",
+                            plan.copyWork().draft().onScreenTexts()));
+            List<String> forbiddenClaims = List.of(
+                    "全网第一",
+                    "完全防水",
+                    "销量第一",
+                    "比一瓶水");
+            if (forbiddenClaims.stream()
+                    .anyMatch(publishableCopy::contains)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent kept an unsupported claim in the content plan");
+            }
+            if (plan.ready()
+                    != plan.review().ready()) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "Agent returned inconsistent review status");
             }
             return;
         }

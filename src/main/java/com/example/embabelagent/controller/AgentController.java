@@ -90,4 +90,11 @@ public class AgentController {
                 request.message());
     }
 
+    @PostMapping("/content-plan")
+    public AgentResponse contentPlan(
+            @Valid @RequestBody AgentRequest request) {
+        return agentService.contentPlan(
+                request.message());
+    }
+
 }

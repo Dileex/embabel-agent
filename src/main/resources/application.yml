@@ -319,3 +319,56 @@ demo:
 
         用户任务：
         {request}
+  product-collaboration-agent:
+    prompts:
+      analyze-product: |
+        请整理ProductBrief：
+        productName、confirmedFacts、sellingPoints、
+        factualBoundaries、rejectedRequests。
+
+        confirmedFacts只能拆分和整理用户提供的已确认信息。
+        sellingPoints只能从confirmedFacts中提取，
+        不增加功效、认证、销量、排名、材质或优惠。
+        factualBoundaries写清不能被扩大解释的事实。
+        内容要求中没有事实支持的说法放进rejectedRequests。
+        只返回结构化对象。
+
+        商品名称：{productName}
+        已确认信息：{confirmedFacts}
+        目标平台：{platform}
+        内容要求：{contentRequirement}
+      create-content: |
+        请生成ProductCopyDraft：
+        title、sellingPoints、videoScript、onScreenTexts、
+        rejectedClaims、skillName、ruleVersion。
+
+        必须先激活商品短视频文案Skill，
+        再读取Skill要求使用的参考规则。
+        只能使用商品简报里的已确认事实和可用卖点。
+        用户要求但商品简报已经拒绝的说法，
+        放进rejectedClaims，不能写进可发布文案。
+        skillName和ruleVersion必须来自Skill及参考规则。
+        只返回结构化对象。
+
+        商品名称：{productName}
+        目标平台：{platform}
+        内容要求：{contentRequirement}
+        商品简报：
+        {brief}
+      review-content: |
+        请检查商品文案，返回ProductContentReview：
+        ready、checkedFacts、unsupportedClaims、issues。
+
+        checkedFacts列出文案实际使用并能在已确认信息中找到的事实。
+        unsupportedClaims列出文案中无法由已确认信息支持的说法。
+        issues列出需要修改的问题。
+        如果没有不受支持的说法，文案也没有越过事实边界，
+        ready为true，issues填写“没有发现需要修改的问题”。
+        只检查，不重写文案。
+        只返回结构化对象。
+
+        已确认信息：{confirmedFacts}
+        事实边界：{factualBoundaries}
+        目标平台：{platform}
+        待检查文案：
+        {draft}
