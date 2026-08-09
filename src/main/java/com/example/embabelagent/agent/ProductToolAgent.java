@@ -49,7 +49,7 @@ public class ProductToolAgent {
                         BusinessAnswer.class);
 
         /*
-         * calledTools由工具方法实际执行时记录，不能由模型伪造。
+         * calledTools由工具成功返回数据后记录，不能由模型伪造。
          * 当用户缺少商品ID等查询条件时，模型可以直接追问，此时两个列表允许为空。
          */
         return new ProductBusinessAnswer(

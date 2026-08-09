@@ -92,7 +92,7 @@ public class ProductBusinessTools {
         private final Map<String, PlatformSpec> platformSpecs;
 
         /*
-         * 记录本次请求真正执行过的工具。它用于返回给调用方观察执行过程，
+         * 记录本次请求成功返回数据的工具。它用于返回给调用方观察执行过程，
          * 不是让模型填写的响应字段。
          */
         private final List<String> calledTools = new ArrayList<>();
@@ -118,11 +118,12 @@ public class ProductBusinessTools {
                         description = "业务系统中的商品ID")
                 String productId) {
             verifyTenant();
-            calledTools.add("query_product");
-            return requireValue(
+            ProductInfo result = requireValue(
                     products,
                     productId,
                     "商品不存在：" + productId);
+            calledTools.add("query_product");
+            return result;
         }
 
         @LlmTool(
@@ -133,11 +134,12 @@ public class ProductBusinessTools {
                         description = "业务系统中的商品ID")
                 String productId) {
             verifyTenant();
-            calledTools.add("query_inventory_price");
-            return requireValue(
+            InventoryPrice result = requireValue(
                     inventoryPrices,
                     productId,
                     "没有找到库存和价格：" + productId);
+            calledTools.add("query_inventory_price");
+            return result;
         }
 
         @LlmTool(
@@ -148,11 +150,12 @@ public class ProductBusinessTools {
                         description = "业务系统中的店铺ID")
                 String storeId) {
             verifyTenant();
-            calledTools.add("query_store");
-            return requireValue(
+            StoreInfo result = requireValue(
                     stores,
                     storeId,
                     "店铺不存在：" + storeId);
+            calledTools.add("query_store");
+            return result;
         }
 
         @LlmTool(
@@ -163,11 +166,12 @@ public class ProductBusinessTools {
                         description = "发布平台中文名称")
                 String platform) {
             verifyTenant();
-            calledTools.add("query_platform_spec");
-            return requireValue(
+            PlatformSpec result = requireValue(
                     platformSpecs,
                     platform,
                     "没有找到平台规则：" + platform);
+            calledTools.add("query_platform_spec");
+            return result;
         }
 
         public List<String> calledTools() {
