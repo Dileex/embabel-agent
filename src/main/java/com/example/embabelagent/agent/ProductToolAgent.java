@@ -7,16 +7,10 @@ import com.embabel.agent.api.common.Ai;
 import com.example.embabelagent.config.ProductToolAgentProperties;
 import com.example.embabelagent.tool.ProductBusinessTools;
 import com.example.embabelagent.tool.ProductBusinessTools.ProductQueryTools;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import java.util.List;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
-@Agent(description = "查询商品业务数据并判断短视频是否具备发布条件")
+@Agent(description = "根据用户问题调用商品业务工具并返回业务结论")
 public class ProductToolAgent {
 
     private final ProductBusinessTools businessTools;
@@ -30,137 +24,64 @@ public class ProductToolAgent {
         this.properties = properties;
     }
 
-    @AchievesGoal(description = "给出有业务数据依据的短视频发布检查结果")
+    @AchievesGoal(description = "给出有业务数据依据的商品业务问题答案")
     @Action(description = "调用只读业务工具检查商品、库存、店铺和平台规则")
-    public ProductPublishAssessment checkPublishReadiness(
-            ProductPublishRequest request,
+    public ProductBusinessAnswer answerBusinessQuestion(
+            ProductBusinessQuestion request,
             Ai ai) {
 
-        // tenantId由Java代码绑定，模型不能切换到其他租户。
+        /*
+         * 每次请求都创建一个新的工具对象。
+         * 这样工具调用记录不会混入其他请求，且模型只能拿到当前租户的数据访问入口。
+         */
         ProductQueryTools tools =
                 businessTools.forTenant(request.tenantId());
 
-        PublishDecision decision = ai
+        BusinessAnswer answer = ai
                 .withDefaultLlm()
-                // 只有显式加入的对象，里面的@LlmTool才会交给模型。
+                /*
+                 * 只有这里显式传入的@LlmTool方法才会出现在本次模型调用中。
+                 * 方法不会自动执行，模型会根据用户问题决定调用一个、多个，或在信息不足时不调用。
+                 */
                 .withToolObject(tools)
                 .createObject(
                         buildPrompt(request),
-                        PublishDecision.class);
+                        BusinessAnswer.class);
 
-        return new ProductPublishAssessment(
-                request.productId(),
-                request.storeId(),
-                request.platform(),
-                request.durationSeconds(),
-                decision,
+        /*
+         * calledTools由工具方法实际执行时记录，不能由模型伪造。
+         * 当用户缺少商品ID等查询条件时，模型可以直接追问，此时两个列表允许为空。
+         */
+        return new ProductBusinessAnswer(
+                request.question(),
+                answer.answer(),
+                answer.evidence(),
                 tools.calledTools());
     }
 
     private String buildPrompt(
-            ProductPublishRequest request) {
-        return properties.checkPublishReadiness()
+            ProductBusinessQuestion request) {
+        return properties.answerBusinessQuestion()
                 .replace(
-                        "{productId}",
-                        request.productId())
-                .replace(
-                        "{storeId}",
-                        request.storeId())
-                .replace(
-                        "{platform}",
-                        request.platform())
-                .replace(
-                        "{durationSeconds}",
-                        Integer.toString(
-                                request.durationSeconds()));
+                        "{question}",
+                        request.question());
     }
 
-    public static ProductPublishRequest parseRequest(
-            String rawMessage,
-            String tenantId) {
-        String message =
-                rawMessage == null ? "" : rawMessage.strip();
-        String duration = readSection(
-                message,
-                "视频时长：",
-                null);
-        try {
-            return new ProductPublishRequest(
-                    tenantId,
-                    readSection(
-                            message,
-                            "商品ID：",
-                            "店铺ID："),
-                    readSection(
-                            message,
-                            "店铺ID：",
-                            "发布平台："),
-                    readSection(
-                            message,
-                            "发布平台：",
-                            "视频时长："),
-                    Integer.parseInt(
-                            duration.replaceAll("[^0-9]", "")));
-        }
-        catch (NumberFormatException ex) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "视频时长必须包含整数秒数",
-                    ex);
-        }
-    }
-
-    private static String readSection(
-            String message,
-            String startMarker,
-            String endMarker) {
-        int start = message.indexOf(startMarker);
-        if (start < 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "缺少字段：" + startMarker);
-        }
-        int contentStart = start + startMarker.length();
-        int end = endMarker == null
-                ? message.length()
-                : message.indexOf(endMarker, contentStart);
-        if (endMarker != null && end < 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "缺少字段：" + endMarker);
-        }
-        String value =
-                message.substring(contentStart, end).strip();
-        value = value.replaceFirst("[；;]+$", "").strip();
-        if (value.isBlank()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "字段不能为空：" + startMarker);
-        }
-        return value;
-    }
-
-    public record ProductPublishRequest(
+    public record ProductBusinessQuestion(
             @NotBlank String tenantId,
-            @NotBlank String productId,
-            @NotBlank String storeId,
-            @NotBlank String platform,
-            @Min(5) int durationSeconds) {
+            @NotBlank String question) {
     }
 
-    public record PublishDecision(
-            boolean publishable,
-            @NotBlank String conclusion,
-            @NotEmpty List<@NotBlank String> evidence,
-            @NotEmpty List<@NotBlank String> blockers) {
+    public record BusinessAnswer(
+            @NotBlank String answer,
+            List<@NotBlank String> evidence) {
     }
 
-    public record ProductPublishAssessment(
-            @NotBlank String productId,
-            @NotBlank String storeId,
-            @NotBlank String platform,
-            @Min(5) int durationSeconds,
-            @Valid @NotNull PublishDecision decision,
-            @NotEmpty List<@NotBlank String> calledTools) {
+    public record ProductBusinessAnswer(
+            @NotBlank String question,
+            @NotBlank String answer,
+            // 信息不足时允许没有证据和工具调用，回答会要求用户补充查询条件。
+            List<@NotBlank String> evidence,
+            List<@NotBlank String> calledTools) {
     }
 }

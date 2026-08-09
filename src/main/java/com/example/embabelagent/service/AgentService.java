@@ -21,8 +21,8 @@ import com.example.embabelagent.agent.ParallelIncidentAgent.AnalysisPart;
 import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentAnalysisReport;
 import com.example.embabelagent.agent.ParallelIncidentAgent.IncidentRequest;
 import com.example.embabelagent.agent.ProductToolAgent;
-import com.example.embabelagent.agent.ProductToolAgent.ProductPublishAssessment;
-import com.example.embabelagent.agent.ProductToolAgent.ProductPublishRequest;
+import com.example.embabelagent.agent.ProductToolAgent.ProductBusinessAnswer;
+import com.example.embabelagent.agent.ProductToolAgent.ProductBusinessQuestion;
 import com.example.embabelagent.agent.QuizAgent.QuizPack;
 import com.example.embabelagent.agent.QuizAgent.QuizQuestion;
 import com.example.embabelagent.dto.AgentResponse;
@@ -132,25 +132,28 @@ public class AgentService {
         return response("video-plan", process, output);
     }
 
-    public AgentResponse productPublishCheck(
+    public AgentResponse productBusinessQuery(
             String tenantId,
             String message) {
-        // 权限在调用模型前检查，不能交给模型决定。
+        /*
+         * 租户权限必须先由应用校验。模型只负责决定查哪些已授权工具，
+         * 不能由模型决定自己能访问哪个租户的数据。
+         */
         productBusinessTools.validateTenantAccess(tenantId);
-        ProductPublishRequest request =
-                ProductToolAgent.parseRequest(
-                        message,
-                        tenantId);
-        AgentInvocation<ProductPublishAssessment> invocation =
+        ProductBusinessQuestion request =
+                new ProductBusinessQuestion(
+                        tenantId,
+                        message.strip());
+        AgentInvocation<ProductBusinessAnswer> invocation =
                 AgentInvocation.create(
                         agentPlatform,
-                        ProductPublishAssessment.class);
+                        ProductBusinessAnswer.class);
         AgentProcess process = invocation.run(request);
-        ProductPublishAssessment output =
-                process.last(ProductPublishAssessment.class);
+        ProductBusinessAnswer output =
+                process.last(ProductBusinessAnswer.class);
         validateOutput(output);
         return response(
-                "product-publish-check",
+                "product-business-query",
                 process,
                 output);
     }
@@ -268,28 +271,10 @@ public class AgentService {
             }
             return;
         }
-        if (output instanceof ProductPublishAssessment assessment) {
+        if (output instanceof ProductBusinessAnswer answer) {
             requireText(
-                    assessment.decision().conclusion(),
-                    "ProductPublishAssessment.decision.conclusion");
-            requireTextList(
-                    assessment.decision().evidence(),
-                    "ProductPublishAssessment.decision.evidence");
-            requireTextList(
-                    assessment.decision().blockers(),
-                    "ProductPublishAssessment.decision.blockers");
-            Set<String> expectedTools = Set.of(
-                    "query_product",
-                    "query_inventory_price",
-                    "query_store",
-                    "query_platform_spec");
-            if (!expectedTools.equals(
-                    new HashSet<>(
-                            assessment.calledTools()))) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_GATEWAY,
-                        "Agent did not query all required business data");
-            }
+                    answer.answer(),
+                    "ProductBusinessAnswer.answer");
             return;
         }
         throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unsupported agent output type");

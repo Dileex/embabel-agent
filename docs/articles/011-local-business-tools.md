@@ -1,23 +1,23 @@
-# 第11篇：Agent怎么调用本地业务工具
+# 第11篇：模型怎么选择本地业务工具
 
 分支：`article/011-local-business-tools`
 
 接口：
 
 ```text
-POST /agent/product-publish-check
+POST /agent/product-query
 ```
 
 调用链：
 
 ```text
-ProductPublishRequest
+ProductBusinessQuestion
 ->ProductToolAgent
 ->ProductBusinessTools
-->ProductPublishAssessment
+->ProductBusinessAnswer
 ```
 
-本篇增加四个只读工具：
+本篇提供四个只读工具，由模型按用户问题选择：
 
 ```text
 query_product
@@ -37,12 +37,12 @@ mvn spring-boot:run
 
 ```bash
 curl -sS -X POST \
-  "http://localhost:8080/agent/product-publish-check" \
+  "http://localhost:8080/agent/product-query" \
   -H "Content-Type: application/json" \
   -H "X-Tenant-Id: tenant-demo" \
   -d '{
-    "message": "商品ID：P-1001；店铺ID：S-2001；发布平台：抖音；视频时长：30秒"
+    "message": "商品P-1001还有多少库存？当前售价是多少？"
   }'
 ```
 
-响应中的`calledTools`用于确认模型实际调用过哪些工具。
+响应中的`calledTools`记录模型实际选择了哪些工具；信息不足时，它也可以是空列表。

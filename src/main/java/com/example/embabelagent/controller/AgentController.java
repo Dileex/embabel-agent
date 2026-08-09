@@ -52,14 +52,14 @@ public class AgentController {
         return agentService.videoPlan(request.message());
     }
 
-    @PostMapping("/product-publish-check")
-    public AgentResponse productPublishCheck(
+    @PostMapping("/product-query")
+    public AgentResponse productQuery(
             @RequestHeader(
                     name = "X-Tenant-Id",
                     defaultValue = "tenant-demo")
             String tenantId,
             @Valid @RequestBody AgentRequest request) {
-        return agentService.productPublishCheck(
+        return agentService.productBusinessQuery(
                 tenantId,
                 request.message());
     }

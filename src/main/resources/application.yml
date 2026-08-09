@@ -198,28 +198,21 @@ demo:
         {storyboard}
   product-tool-agent:
     prompts:
-      check-publish-readiness: |
-        请判断这个商品视频是否具备发布条件，
-        返回PublishDecision：
-        publishable、conclusion、evidence、blockers。
+      answer-business-question: |
+        请回答用户的商品业务问题，
+        返回BusinessAnswer：
+        answer、evidence。
 
-        你可以使用商品、库存价格、店铺和平台规则查询工具。
-        必须查询这四类数据后再判断，不能根据商品ID或常识猜测。
+        先理解用户的问题，再根据每个工具的名称、说明和参数，
+        选择能补全答案所需的工具。
+        不要为了凑数量调用工具，也不要调用与问题无关的工具。
+        需要综合判断时，查询所有能支撑这个判断的必要事实。
 
-        判断规则：
-        商品必须处于ON_SALE状态；
-        可售库存必须大于0；
-        店铺必须启用，并且允许发布到目标平台；
-        视频时长不能超过平台允许的最大时长；
-        商品价格和发布必填信息必须能从工具结果中找到。
-
-        evidence列出3到6条工具返回的事实。
-        没有阻塞项时，blockers填写“没有阻塞项”。
-        存在阻塞项时，publishable必须为false，
-        blockers列出具体原因。
+        如果缺少查询所需的商品ID、店铺ID或平台名称，
+        直接说明还需要什么信息，不要猜测，也不要调用无关工具。
+        answer只能根据工具返回的事实作答。
+        evidence列出支持答案的关键事实；没有查询结果时返回空列表。
         只返回结构化对象。
 
-        商品ID：{productId}
-        店铺ID：{storeId}
-        发布平台：{platform}
-        视频时长：{durationSeconds}秒
+        用户问题：
+        {question}

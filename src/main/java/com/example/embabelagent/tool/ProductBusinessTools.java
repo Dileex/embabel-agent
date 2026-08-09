@@ -59,6 +59,10 @@ public class ProductBusinessTools {
 
     public ProductQueryTools forTenant(String tenantId) {
         validateTenantAccess(tenantId);
+        /*
+         * 不复用单例工具对象：calledTools是一次请求的执行记录，
+         * 独立对象可以避免并发请求把彼此调用过的工具混在一起。
+         */
         return new ProductQueryTools(
                 tenantId,
                 products,
@@ -87,6 +91,10 @@ public class ProductBusinessTools {
 
         private final Map<String, PlatformSpec> platformSpecs;
 
+        /*
+         * 记录本次请求真正执行过的工具。它用于返回给调用方观察执行过程，
+         * 不是让模型填写的响应字段。
+         */
         private final List<String> calledTools = new ArrayList<>();
 
         private ProductQueryTools(
@@ -163,6 +171,7 @@ public class ProductBusinessTools {
         }
 
         public List<String> calledTools() {
+            // 同一工具被模型重复调用时，响应中只保留一次工具名，并保持首次调用顺序。
             return List.copyOf(
                     new LinkedHashSet<>(calledTools));
         }
