@@ -165,6 +165,8 @@ public class AgentService {
             String message) {
         ProductKnowledgeQuestion question =
                 ProductKnowledgeAgent.parseRequest(message);
+
+        // 目标输出类型确定后，Embabel会选择能生成该对象的Agent和Action。
         AgentInvocation<ProductKnowledgeAnswer> invocation =
                 AgentInvocation.create(
                         agentPlatform,

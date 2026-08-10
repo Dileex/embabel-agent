@@ -35,6 +35,8 @@ public class ProductKnowledgeAgent {
     public RetrievedKnowledge retrieveKnowledge(
             ProductKnowledgeQuestion question) {
 
+        // 商品ID和平台一起参与向量化，
+        // 让问题保留当前业务上下文。
         String query = String.join(
                 " ",
                 question.productId(),
@@ -42,18 +44,22 @@ public class ProductKnowledgeAgent {
                 question.question());
 
         List<KnowledgeMatch> matches;
+        // 同一时间只执行一次问题向量生成和Lucene检索，
+        // 后面的DeepSeek回答生成不在锁内。
         synchronized (productKnowledgeSearch) {
             matches = productKnowledgeSearch
-                    .textSearch(
+                    .vectorSearch(
                             RagRequest.query(query)
                                     .withTopK(6)
-                                    .withSimilarityThreshold(0.0),
+                                    .withSimilarityThreshold(0.5),
                             Chunk.class)
                     .stream()
                     .map(ProductKnowledgeAgent::toMatch)
                     .toList();
         }
 
+        // 含义接近不代表资料属于当前商品和平台，
+        // 再做一次业务字段校验。
         boolean hasProduct = matches.stream()
                 .anyMatch(match -> match.text()
                         .contains(question.productId()));
@@ -73,6 +79,7 @@ public class ProductKnowledgeAgent {
             RetrievedKnowledge knowledge,
             Ai ai) {
 
+        // 没有可靠片段时直接返回，不让模型根据常识补写答案。
         if (knowledge.matches().isEmpty()) {
             return new ProductKnowledgeAnswer(
                     false,
@@ -81,12 +88,14 @@ public class ProductKnowledgeAgent {
                     List.of());
         }
 
+        // 只把已经检索到的片段放进提示词。
         KnowledgeDraft draft = ai
                 .withDefaultLlm()
                 .createObject(
                         buildPrompt(knowledge),
                         KnowledgeDraft.class);
 
+        // 引用由Java根据检索结果生成，不交给模型填写。
         List<String> citations = knowledge.matches()
                 .stream()
                 .map(KnowledgeMatch::source)

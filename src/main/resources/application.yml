@@ -1,6 +1,7 @@
 embabel:
   models:
     default-llm: deepseek-v4-flash
+    default-embedding-model: bge-m3
   agent:
     platform:
       models:
@@ -9,6 +10,15 @@ embabel:
             api-key: ${DEEPSEEK_API_KEY}
             base-url: https://api.deepseek.com
             models: deepseek-v4-flash
+
+spring:
+  ai:
+    model:
+      embedding: ollama
+    ollama:
+      base-url: http://localhost:11434
+      embedding:
+        model: bge-m3
 
 demo:
   quiz-agent:
