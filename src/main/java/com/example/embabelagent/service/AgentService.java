@@ -196,7 +196,16 @@ public class AgentService {
                 AgentInvocation.create(
                         agentPlatform,
                         RemotePlatformPublishAssessment.class);
-        AgentProcess process = invocation.run(request);
+        AgentProcess process;
+        try {
+            process = invocation.run(request);
+        }
+        catch (RuntimeException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "MCP平台规则读取失败",
+                    ex);
+        }
         RemotePlatformPublishAssessment output =
                 process.last(
                         RemotePlatformPublishAssessment.class);

@@ -4,7 +4,6 @@ import com.embabel.agent.api.annotation.AchievesGoal;
 import com.embabel.agent.api.annotation.Action;
 import com.embabel.agent.api.annotation.Agent;
 import com.embabel.agent.api.common.Ai;
-import com.example.embabelagent.agent.ProductToolAgent.ProductPublishRequest;
 import com.example.embabelagent.config.RemotePlatformAgentProperties;
 import com.example.embabelagent.tool.ProductBusinessTools;
 import com.example.embabelagent.tool.ProductBusinessTools.LocalProductQueryTools;
@@ -17,7 +16,7 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
-@Agent(description = "组合本地业务查询和远程MCP平台规则检查商品视频")
+@Agent(description = "组合本地业务查询和MCP规则文件检查商品视频")
 public class RemotePlatformToolAgent {
 
     private final ProductBusinessTools businessTools;
@@ -31,8 +30,8 @@ public class RemotePlatformToolAgent {
         this.properties = properties;
     }
 
-    @AchievesGoal(description = "给出同时包含本地业务数据和远程平台规则的发布检查结果")
-    @Action(description = "调用本地工具和远程MCP工具检查商品视频")
+    @AchievesGoal(description = "给出同时包含本地业务数据和MCP规则文件的发布检查结果")
+    @Action(description = "调用本地工具和MCP文件工具检查商品视频")
     public RemotePlatformPublishAssessment checkPublishReadiness(
             ProductPublishRequest request,
             Ai ai) {
@@ -46,7 +45,7 @@ public class RemotePlatformToolAgent {
                 .withToolObject(localTools)
                 .withToolGroup(
                         "platform-rules",
-                        "query_platform_rule")
+                        "read_text_file")
                 .createObject(
                         buildPrompt(request),
                         RemotePublishDecision.class);

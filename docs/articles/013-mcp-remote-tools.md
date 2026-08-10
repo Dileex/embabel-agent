@@ -1,13 +1,4 @@
-# 第13篇：业务工具不在当前项目里，Agent怎么远程调用
-
-分支：`article/013-mcp-remote-tools`
-
-进程：
-
-```text
-主应用：8080
-平台规则MCP服务：8081
-```
+# 第13篇：Agent怎么调用MCP文件工具
 
 接口：
 
@@ -15,19 +6,37 @@
 POST /agent/mcp-publish-check
 ```
 
-启动MCP服务：
+执行链：
 
-```bash
-mvn -f platform-rules-mcp-server/pom.xml \
-  spring-boot:run
+```text
+ProductPublishRequest
+->RemotePlatformToolAgent
+->本地商品、库存和店铺工具
+->filesystem MCP读取平台规则
+->RemotePlatformPublishAssessment
 ```
 
-启动主应用：
+平台规则文件：
+
+```text
+mcp-files/douyin-rules.md
+```
+
+启动：
 
 ```bash
 export DEEPSEEK_API_KEY=<your-deepseek-api-key>
 mvn spring-boot:run
 ```
+
+主应用会通过stdio启动：
+
+```text
+npx -y @modelcontextprotocol/server-filesystem@2026.7.10 \
+  <项目目录>/mcp-files
+```
+
+这里使用stdio只是为了让示例少启动一个服务。实际项目可以把MCP Server独立部署，再通过Streamable HTTP等方式连接远程服务。
 
 请求：
 
@@ -37,26 +46,30 @@ curl -sS -X POST \
   -H "Content-Type: application/json" \
   -H "X-Tenant-Id: tenant-demo" \
   -d '{
-    "message": "商品ID：P-1001；店铺ID：S-2001；发布平台：抖音；视频时长：30秒"
+    "message": "商品ID：P-1001；店铺ID：S-2001；发布平台：抖音；视频时长：360秒"
   }'
 ```
 
-本地工具查询商品、库存和店铺，远程MCP工具`query_platform_rule`查询平台规则。
+三个本地工具查询商品、库存和店铺，MCP工具`read_text_file`读取平台规则。
 
-成功响应应包含：
+响应中的`localCalledTools`应包含：
 
 ```text
-localCalledTools=
-query_product、query_inventory_price、query_store
+query_product
+query_inventory_price
+query_store
+```
 
+规则字段应包含：
+
+```text
 platformRuleSource=platform-rules-mcp
 platformRuleVersion=demo-2026-08
+publishable=false
 ```
 
-平台规则服务日志应出现：
+主应用日志应出现：
 
 ```text
-MCP tool query_platform_rule called, platform=抖音
+calling tool read_text_file
 ```
-
-停止8081后再次调用，接口应返回`502`，不会改用第11篇的本地平台规则。
