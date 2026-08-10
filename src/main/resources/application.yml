@@ -15,6 +15,12 @@ spring:
                 - -y
                 - "@modelcontextprotocol/server-filesystem@2026.7.10"
                 - "${user.dir}/mcp-files"
+    model:
+      embedding: ollama
+    ollama:
+      base-url: http://localhost:11434
+      embedding:
+        model: bge-m3
 
 embabel:
   models:
@@ -35,15 +41,6 @@ embabel:
             provider: filesystem-mcp
             tools:
               - read_text_file
-
-spring:
-  ai:
-    model:
-      embedding: ollama
-    ollama:
-      base-url: http://localhost:11434
-      embedding:
-        model: bge-m3
 
 demo:
   quiz-agent:
