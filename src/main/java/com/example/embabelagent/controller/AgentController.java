@@ -3,11 +3,14 @@ package com.example.embabelagent.controller;
 import com.example.embabelagent.dto.AgentRequest;
 import com.example.embabelagent.dto.AgentResponse;
 import com.example.embabelagent.service.AgentService;
+import com.example.embabelagent.service.ProductContentHitlService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -16,8 +19,13 @@ public class AgentController {
 
     private final AgentService agentService;
 
-    public AgentController(AgentService agentService) {
+    private final ProductContentHitlService contentHitlService;
+
+    public AgentController(
+            AgentService agentService,
+            ProductContentHitlService contentHitlService) {
         this.agentService = agentService;
+        this.contentHitlService = contentHitlService;
     }
 
     @PostMapping("/ask")
@@ -95,6 +103,23 @@ public class AgentController {
             @Valid @RequestBody AgentRequest request) {
         return agentService.contentPlan(
                 request.message());
+    }
+
+    @PostMapping("/content-plan-hitl")
+    public ProductContentHitlService.HitlResponse startContentHitl(
+            @Valid @RequestBody AgentRequest request) {
+        return contentHitlService.start(
+                request.message());
+    }
+
+    @PostMapping(
+            "/content-plan-hitl/{processId}/confirm")
+    public ProductContentHitlService.HitlResponse confirmContentHitl(
+            @PathVariable String processId,
+            @RequestParam boolean accepted) {
+        return contentHitlService.confirm(
+                processId,
+                accepted);
     }
 
 }
