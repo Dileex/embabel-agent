@@ -11,8 +11,8 @@ ProductMediaRetryAgent
 ->POST /agent/media-task-retry
 ```
 
-启动时默认不要求 Ollama、`bge-m3` 或 `npx`。第17篇的重试接口是本地 Java 逻辑，
-直接启动即可：
+重试接口只使用本地 Java 逻辑。默认启动不会连接 Ollama，
+也不会拉起 `npx`，直接启动即可：
 
 ```bash
 mvn spring-boot:run
