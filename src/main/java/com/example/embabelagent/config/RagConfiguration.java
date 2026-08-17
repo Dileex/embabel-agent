@@ -8,10 +8,15 @@ import java.util.List;
 import org.springframework.ai.ollama.OllamaEmbeddingModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@ConditionalOnProperty(
+        prefix = "demo.integrations",
+        name = "rag-enabled",
+        havingValue = "true")
 public class RagConfiguration {
 
     private static final List<String> KNOWLEDGE_FILES = List.of(

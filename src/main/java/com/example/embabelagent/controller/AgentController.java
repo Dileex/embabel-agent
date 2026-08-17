@@ -4,6 +4,7 @@ import com.example.embabelagent.dto.AgentRequest;
 import com.example.embabelagent.dto.AgentResponse;
 import com.example.embabelagent.service.AgentService;
 import com.example.embabelagent.service.ProductContentHitlService;
+import com.example.embabelagent.service.ProductMediaRetryService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,11 +22,15 @@ public class AgentController {
 
     private final ProductContentHitlService contentHitlService;
 
+    private final ProductMediaRetryService mediaRetryService;
+
     public AgentController(
             AgentService agentService,
-            ProductContentHitlService contentHitlService) {
+            ProductContentHitlService contentHitlService,
+            ProductMediaRetryService mediaRetryService) {
         this.agentService = agentService;
         this.contentHitlService = contentHitlService;
+        this.mediaRetryService = mediaRetryService;
     }
 
     @PostMapping("/ask")
@@ -120,6 +125,17 @@ public class AgentController {
         return contentHitlService.confirm(
                 processId,
                 accepted);
+    }
+
+    @PostMapping("/media-task-retry")
+    public ProductMediaRetryService.RetryResponse mediaTaskRetry(
+            @RequestParam(defaultValue = "轻量通勤双肩包")
+            String productName,
+            @RequestParam(defaultValue = "2")
+            int failuresBeforeSuccess) {
+        return mediaRetryService.create(
+                productName,
+                failuresBeforeSuccess);
     }
 
 }

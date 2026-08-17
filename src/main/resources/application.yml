@@ -2,7 +2,7 @@ spring:
   ai:
     mcp:
       client:
-        enabled: true
+        enabled: false
         name: embabel-product-agent
         version: 1.0.0
         request-timeout: 5s
@@ -31,7 +31,7 @@ embabel:
       models:
         openai:
           custom:
-            api-key: ${DEEPSEEK_API_KEY}
+            api-key: ${DEEPSEEK_API_KEY:demo-key}
             base-url: https://api.deepseek.com
             models: deepseek-v4-flash
       tools:
@@ -43,6 +43,14 @@ embabel:
               - read_text_file
 
 demo:
+  integrations:
+    # 第17篇默认只演示重试，不要求启动Ollama或npx。
+    rag-enabled: false
+  media-task-retry:
+    max-attempts: 3
+    backoff-millis: 100
+    backoff-multiplier: 2.0
+    backoff-max-interval: 1000
   quiz-agent:
     prompts:
       extract-concepts: |

@@ -14,10 +14,15 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 @Agent(description = "从商品资料、品牌规范和平台规则中检索证据并回答问题")
+@ConditionalOnProperty(
+        prefix = "demo.integrations",
+        name = "rag-enabled",
+        havingValue = "true")
 public class ProductKnowledgeAgent {
 
     private final LuceneSearchOperations productKnowledgeSearch;
