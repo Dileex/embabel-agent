@@ -4,12 +4,22 @@
 
 这篇在第16篇代码基础上，只增加Action级有限重试示例：
 
+接口接收已经完成上游处理的商品任务，本次`AgentProcess`
+从创建素材任务开始：
+
 ```text
-ProductMediaRetryAgent
+POST /agent/media-task-retry
+->AgentController
+->ProductMediaRetryService创建MediaTaskRequest
+->AgentInvocation启动AgentProcess
+->ProductMediaRetryAgent.createMediaTask
 ->MockMediaService
-->ProductMediaRetryService
-->POST /agent/media-task-retry
+->临时异常时重试同一个Action
+->成功后COMPLETED，耗尽后由Service返回FAILED
 ```
+
+重试沿用同一个`requestId`和`MediaTaskRequest`，不会重新进入Controller，
+也不会重跑第16篇的内容生成与人工确认流程。
 
 重试接口只使用本地 Java 逻辑。默认启动不会连接 Ollama，
 也不会拉起 `npx`，直接启动即可：
