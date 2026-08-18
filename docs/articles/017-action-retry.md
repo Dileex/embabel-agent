@@ -1,6 +1,6 @@
 # 17.Embabel Agent1.0.0重试实战：素材服务偶尔失败，Action该不该再跑一次
 
-分支：`codex/017-action-retry`
+分支：`article/017-action-retry`
 
 这篇在第16篇代码基础上，只增加Action级有限重试示例：
 

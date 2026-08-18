@@ -1,6 +1,6 @@
 # 第16篇：商品内容生成后，先等人工确认
 
-分支：`codex/016-native-hitl`
+分支：`article/016-native-hitl`
 基线：`article/015-multi-agent-collaboration`
 
 本分支只增加第16篇的HITL代码：
